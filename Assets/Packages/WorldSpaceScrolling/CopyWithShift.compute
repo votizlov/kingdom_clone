@@ -1,0 +1,91 @@
+#pragma kernel CSMain
+#pragma kernel ClearTexture
+#pragma kernel ShiftTexture
+#pragma kernel ReplaceTexture
+#pragma kernel RestoreTexture
+
+RWTexture2D<float4> _Result;
+RWTexture2D<float4> _Result2;
+Texture2D<float4> _InputTexture;
+Texture2D<float4> _InputTexture_2;
+Texture2D<float4> _InputTexture3;
+RWTexture2D<float4> _Result3;
+Texture2D<float4> _InputTexture4;
+RWTexture2D<float4> _Result4;
+SamplerState LinearClampSampler;
+RWTexture2D<float4> _Result5;
+
+
+float4 _offset;
+int _pixelOffsetX;
+int _pixelOffsetY;
+float _offsetFix;
+float _restoreSpeed;
+//float offsetsX[512];
+//float offsetsY[512];
+[numthreads(32,32,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float4 resultColor = _Result[id.xy];
+    float4 inp = _InputTexture[id.xy];
+    float4 inp_up = _InputTexture_2[id.xy];
+    inp.y = inp_up.x;
+    if(id.x>1 && id.x<512 &&id.y>1&&id.y<512)
+    {
+        _Result[id.xy] = max(resultColor,inp);
+    } else
+    {
+        _Result[id.xy] = float4(0,0,0,0);
+    }
+}
+
+[numthreads(32, 32, 1)]
+void ClearTexture (uint3 id : SV_DispatchThreadID)
+{
+    _Result2[id.xy] = float4(0,0,0,0);
+}
+[numthreads(32, 32, 1)]
+void ShiftTexture (uint3 id : SV_DispatchThreadID)
+{
+    //const float width = 511.0;
+    //float2 UV = float2((float)id.x / width,(float)id.y / width);//float2(offsetsX[id.x*512+id.y],offsetsY[id.x*512+id.y]);//
+    //float2 d =UV-float2(0.5,0.5);
+    //UV += d*_offsetFix;//1/512 for 512 texture
+    //uint2 reconstructedID = uint2(UV.x*width, UV.y*width);
+    //float4 sampledColor = _InputTexture3.SampleLevel(LinearClampSampler, UV+_offset.xy,0);
+        _Result3[id.xy] = _InputTexture3[id.xy+int2(_pixelOffsetX,_pixelOffsetY)];
+}
+[numthreads(32, 32, 1)]
+void ReplaceTexture (uint3 id : SV_DispatchThreadID)
+{
+    _Result4[id.xy] = _InputTexture4[id.xy];
+}
+[numthreads(32, 32, 1)]
+void RestoreTexture (uint3 id : SV_DispatchThreadID)
+{
+    _Result5[id.xy] = _Result5[id.xy]-_restoreSpeed;
+}
+/*
+[numthreads(8, 8, 1)]
+void CopyOffset (uint3 id : SV_DispatchThreadID)
+{
+    const uint width = 256;
+    const uint height = 256;
+//_offset = float4(1,1,0,0);
+    float2 UV = float2(1-id.x / -(float)width, 1-id.y / -(float)height);
+    //float2 floatID = float2(id.xy);
+    //float2 signedCoords = floatID - _offset.xy;
+    
+    //uint2 newCoords = id.xy + float2(_offset.xy);
+    //bool isDiscardPixel = id.x < 5 || id.y < 5 || id.x > width - 5 || id.y > height - 5;
+
+    if (id.x < 5 || id.y < 5 || id.x > width - 5 || id.y > height - 5)
+    {
+        //float4 originalColor = _Result2[id.xy];
+        //_Result2[newCoords] = originalColor;
+        //float4 color = _Result2.Sample(sampler_Result2, float2(_offset.x,_offset.y));
+        _Result2[id.xy] = float4(0, 0, 0, 0);
+    } else {
+        _Result2[id.xy] = _BeforeOffsetTexture.SampleLevel(linearRepeatSampler, UV-_offset.xy,0);        
+    }
+}*/

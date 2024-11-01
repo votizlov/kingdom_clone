@@ -1,161 +1,266 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Events;
+
 using UnityEngine.InputSystem;
+
+public enum GroundType
+{
+    None,
+    Soft,
+    Hard
+}
 
 public class CharacterController2D : MonoBehaviour
 {
-    [SerializeField] private float m_JumpForce = 400f;							// Amount of force added when the player jumps.
-    	[Range(0, 1)] [SerializeField] private float m_CrouchSpeed = .36f;			// Amount of maxSpeed applied to crouching movement. 1 = 100%
-    	[Range(0, .3f)] [SerializeField] private float m_MovementSmoothing = .05f;	// How much to smooth out the movement
-    	[SerializeField] private bool m_AirControl = false;							// Whether or not a player can steer while jumping;
-    	[SerializeField] private LayerMask m_WhatIsGround;							// A mask determining what is ground to the character
-    	[SerializeField] private Transform m_GroundCheck;							// A position marking where to check if the player is grounded.
-    	[SerializeField] private Transform m_CeilingCheck;							// A position marking where to check for ceilings
-    	[SerializeField] private Collider2D m_CrouchDisableCollider;				// A collider that will be disabled when crouching
-    
-    	const float k_GroundedRadius = .2f; // Radius of the overlap circle to determine if grounded
-    	private bool m_Grounded;            // Whether or not the player is grounded.
-    	const float k_CeilingRadius = .2f; // Radius of the overlap circle to determine if the player can stand up
-    	private Rigidbody2D m_Rigidbody2D;
-    	private bool m_FacingRight = true;  // For determining which way the player is currently facing.
-		private Vector3 m_Velocity = Vector3.zero;
-		private float velocityBuffer = 0;
-    
-    	[Header("Events")]
-    	[Space]
-    
-    	public UnityEvent OnLandEvent;
-    
-    	[System.Serializable]
-    	public class BoolEvent : UnityEvent<bool> { }
-    
-    	public BoolEvent OnCrouchEvent;
-    	private bool m_wasCrouching = false;
-    
-    	private void Awake()
-    	{
-    		m_Rigidbody2D = GetComponent<Rigidbody2D>();
-    
-    		if (OnLandEvent == null)
-    			OnLandEvent = new UnityEvent();
-    
-    		if (OnCrouchEvent == null)
-    			OnCrouchEvent = new BoolEvent();
-    	}
-    
-    	private void FixedUpdate()
-    	{
-    		bool wasGrounded = m_Grounded;
-    		m_Grounded = false;
-    
-    		// The player is grounded if a circlecast to the groundcheck position hits anything designated as ground
-    		// This can be done using layers instead but Sample Assets will not overwrite your project settings.
-    		Collider2D[] colliders = Physics2D.OverlapCircleAll(m_GroundCheck.position, k_GroundedRadius, m_WhatIsGround);
-    		for (int i = 0; i < colliders.Length; i++)
-    		{
-    			if (colliders[i].gameObject != gameObject)
-    			{
-    				m_Grounded = true;
-    				if (!wasGrounded)
-    					OnLandEvent.Invoke();
-    			}
-    		}
-            Move(velocityBuffer*Time.fixedDeltaTime,false,false);
+    readonly Vector3 flippedScale = new Vector3(-1, 1, 1);
+    readonly Quaternion flippedRotation = new Quaternion(0, 0, 1, 0);
+
+    [Header("Character")]
+    [SerializeField] Animator animator = null;
+    [SerializeField] Transform puppet = null;
+    [SerializeField] CharacterAudio audioPlayer = null;
+
+    [Header("Tail")]
+    [SerializeField] Transform tailAnchor = null;
+    [SerializeField] Rigidbody2D tailRigidbody = null;
+
+    [Header("Equipment")]
+    [SerializeField] Transform handAnchor = null;
+    [SerializeField] UnityEngine.U2D.Animation.SpriteLibrary spriteLibrary = null;
+
+    [Header("Movement")]
+    [SerializeField] float acceleration = 0.0f;
+    [SerializeField] float maxSpeed = 0.0f;
+    [SerializeField] float jumpForce = 0.0f;
+    [SerializeField] float minFlipSpeed = 0.1f;
+    [SerializeField] float jumpGravityScale = 1.0f;
+    [SerializeField] float fallGravityScale = 1.0f;
+    [SerializeField] float groundedGravityScale = 1.0f;
+    [SerializeField] bool resetSpeedOnLand = false;
+
+    private Rigidbody2D controllerRigidbody;
+    private Collider2D controllerCollider;
+    private LayerMask softGroundMask;
+    private LayerMask hardGroundMask;
+
+    private Vector2 movementInput;
+    private bool jumpInput;
+
+    private Vector2 prevVelocity;
+    private GroundType groundType;
+    private bool isFlipped;
+    private bool isJumping;
+    private bool isFalling;
+
+    private int animatorGroundedBool;
+    private int animatorRunningSpeed;
+    private int animatorJumpTrigger;
+
+    public bool CanMove { get; set; }
+
+    void Start()
+    {
+#if UNITY_EDITOR
+        if (Keyboard.current == null)
+        {
+            var playerSettings = new UnityEditor.SerializedObject(Resources.FindObjectsOfTypeAll<UnityEditor.PlayerSettings>()[0]);
+            var newInputSystemProperty = playerSettings.FindProperty("enableNativePlatformBackendsForNewInputSystem");
+            bool newInputSystemEnabled = newInputSystemProperty != null ? newInputSystemProperty.boolValue : false;
+
+            if (newInputSystemEnabled)
+            {
+                var msg = "New Input System backend is enabled but it requires you to restart Unity, otherwise the player controls won't work. Do you want to restart now?";
+                if (UnityEditor.EditorUtility.DisplayDialog("Warning", msg, "Yes", "No"))
+                {
+                    UnityEditor.EditorApplication.ExitPlaymode();
+                    var dataPath = Application.dataPath;
+                    var projectPath = dataPath.Substring(0, dataPath.Length - 7);
+                    UnityEditor.EditorApplication.OpenProject(projectPath);
+                }
+            }
+        }
+#endif
+
+        controllerRigidbody = GetComponent<Rigidbody2D>();
+        controllerCollider = GetComponent<Collider2D>();
+        softGroundMask = LayerMask.GetMask("Ground Soft");
+        hardGroundMask = LayerMask.GetMask("Ground Hard");
+
+        animatorGroundedBool = Animator.StringToHash("Grounded");
+        animatorRunningSpeed = Animator.StringToHash("RunningSpeed");
+        animatorJumpTrigger = Animator.StringToHash("Jump");
+
+        CanMove = true;
+    }
+
+    void Update()
+    {
+        var keyboard = Keyboard.current;
+
+        if (!CanMove || keyboard == null)
+            return;
+
+        // Horizontal movement
+        float moveHorizontal = 0.0f;
+
+        if (keyboard.leftArrowKey.isPressed || keyboard.aKey.isPressed)
+            moveHorizontal = -1.0f;
+        else if (keyboard.rightArrowKey.isPressed || keyboard.dKey.isPressed)
+            moveHorizontal = 1.0f;
+
+        movementInput = new Vector2(moveHorizontal, 0);
+
+        // Jumping input
+        if (!isJumping && keyboard.spaceKey.wasPressedThisFrame)
+            jumpInput = true;
+    }
+
+    void FixedUpdate()
+    {
+        UpdateGrounding();
+        UpdateVelocity();
+        UpdateDirection();
+        UpdateJump();
+        UpdateTailPose();
+        UpdateGravityScale();
+
+        prevVelocity = controllerRigidbody.velocity;
+    }
+
+    private void UpdateGrounding()
+    {
+        // Use character collider to check if touching ground layers
+        if (controllerCollider.IsTouchingLayers(softGroundMask))
+            groundType = GroundType.Soft;
+        else if (controllerCollider.IsTouchingLayers(hardGroundMask))
+            groundType = GroundType.Hard;
+        else
+            groundType = GroundType.None;
+
+        // Update animator
+        animator.SetBool(animatorGroundedBool, groundType != GroundType.None);
+    }
+
+    private void UpdateVelocity()
+    {
+        Vector2 velocity = controllerRigidbody.velocity;
+
+        // Apply acceleration directly as we'll want to clamp
+        // prior to assigning back to the body.
+        velocity += movementInput * acceleration * Time.fixedDeltaTime;
+
+        // We've consumed the movement, reset it.
+        movementInput = Vector2.zero;
+
+        // Clamp horizontal speed.
+        velocity.x = Mathf.Clamp(velocity.x, -maxSpeed, maxSpeed);
+
+        // Assign back to the body.
+        controllerRigidbody.velocity = velocity;
+
+        // Update animator running speed
+        var horizontalSpeedNormalized = Mathf.Abs(velocity.x) / maxSpeed;
+        animator.SetFloat(animatorRunningSpeed, horizontalSpeedNormalized);
+
+        // Play audio
+        audioPlayer.PlaySteps(groundType, horizontalSpeedNormalized);
+    }
+
+    private void UpdateJump()
+    {
+        // Set falling flag
+        if (isJumping && controllerRigidbody.velocity.y < 0)
+            isFalling = true;
+
+        // Jump
+        if (jumpInput && groundType != GroundType.None)
+        {
+            // Jump using impulse force
+            controllerRigidbody.AddForce(new Vector2(0, jumpForce), ForceMode2D.Impulse);
+
+            // Set animator
+            animator.SetTrigger(animatorJumpTrigger);
+
+            // We've consumed the jump, reset it.
+            jumpInput = false;
+
+            // Set jumping flag
+            isJumping = true;
+
+            // Play audio
+            audioPlayer.PlayJump();
         }
 
-        public void OnMove(InputAction.CallbackContext context)
+        // Landed
+        else if (isJumping && isFalling && groundType != GroundType.None)
         {
-	        velocityBuffer = context.ReadValue<Vector2>().x*40;
+            // Since collision with ground stops rigidbody, reset velocity
+            if (resetSpeedOnLand)
+            {
+                prevVelocity.y = controllerRigidbody.velocity.y;
+                controllerRigidbody.velocity = prevVelocity;
+            }
+
+            // Reset jumping flags
+            isJumping = false;
+            isFalling = false;
+
+            // Play audio
+            audioPlayer.PlayLanding(groundType);
         }
-        
-        public void OnClick(InputAction.CallbackContext context)
+    }
+
+    private void UpdateDirection()
+    {
+        // Use scale to flip character depending on direction
+        if (controllerRigidbody.velocity.x > minFlipSpeed && isFlipped)
         {
-	        Debug.Log("clicked");
+            isFlipped = false;
+            puppet.localScale = Vector3.one;
         }
-    
-    
-    	public void Move(float move, bool crouch, bool jump)
-    	{
-    		// If crouching, check to see if the character can stand up
-    		if (!crouch)
-    		{
-    			// If the character has a ceiling preventing them from standing up, keep them crouching
-    			if (Physics2D.OverlapCircle(m_CeilingCheck.position, k_CeilingRadius, m_WhatIsGround))
-    			{
-    				crouch = true;
-    			}
-    		}
-    
-    		//only control the player if grounded or airControl is turned on
-    		if (m_Grounded || m_AirControl)
-    		{
-    
-    			// If crouching
-    			if (crouch)
-    			{
-    				if (!m_wasCrouching)
-    				{
-    					m_wasCrouching = true;
-    					OnCrouchEvent.Invoke(true);
-    				}
-    
-    				// Reduce the speed by the crouchSpeed multiplier
-    				move *= m_CrouchSpeed;
-    
-    				// Disable one of the colliders when crouching
-    				if (m_CrouchDisableCollider != null)
-    					m_CrouchDisableCollider.enabled = false;
-    			} else
-    			{
-    				// Enable the collider when not crouching
-    				if (m_CrouchDisableCollider != null)
-    					m_CrouchDisableCollider.enabled = true;
-    
-    				if (m_wasCrouching)
-    				{
-    					m_wasCrouching = false;
-    					OnCrouchEvent.Invoke(false);
-    				}
-    			}
-    
-    			// Move the character by finding the target velocity
-    			Vector3 targetVelocity = new Vector2(move * 10f, m_Rigidbody2D.velocity.y);
-    			// And then smoothing it out and applying it to the character
-    			m_Rigidbody2D.velocity = Vector3.SmoothDamp(m_Rigidbody2D.velocity, targetVelocity, ref m_Velocity, m_MovementSmoothing);
-    
-    			// If the input is moving the player right and the player is facing left...
-    			if (move > 0 && !m_FacingRight)
-    			{
-    				// ... flip the player.
-    				Flip();
-    			}
-    			// Otherwise if the input is moving the player left and the player is facing right...
-    			else if (move < 0 && m_FacingRight)
-    			{
-    				// ... flip the player.
-    				Flip();
-    			}
-    		}
-    		// If the player should jump...
-    		if (m_Grounded && jump)
-    		{
-    			// Add a vertical force to the player.
-    			m_Grounded = false;
-    			m_Rigidbody2D.AddForce(new Vector2(0f, m_JumpForce));
-    		}
-    	}
-    
-    
-    	private void Flip()
-    	{
-    		// Switch the way the player is labelled as facing.
-    		m_FacingRight = !m_FacingRight;
-    
-    		// Multiply the player's x local scale by -1.
-    		Vector3 theScale = transform.localScale;
-    		theScale.x *= -1;
-    		transform.localScale = theScale;
-    	}
+        else if (controllerRigidbody.velocity.x < -minFlipSpeed && !isFlipped)
+        {
+            isFlipped = true;
+            puppet.localScale = flippedScale;
+        }
+    }
+
+    private void UpdateTailPose()
+    {
+        // Calculate the extrapolated target position of the tail anchor.
+        Vector2 targetPosition = tailAnchor.position;
+        targetPosition += controllerRigidbody.velocity * Time.fixedDeltaTime;
+
+        tailRigidbody.MovePosition(targetPosition);
+        if (isFlipped)
+            tailRigidbody.SetRotation(tailAnchor.rotation * flippedRotation);
+        else
+            tailRigidbody.SetRotation(tailAnchor.rotation);
+    }
+
+    private void UpdateGravityScale()
+    {
+        // Use grounded gravity scale by default.
+        var gravityScale = groundedGravityScale;
+
+        if (groundType == GroundType.None)
+        {
+            // If not grounded then set the gravity scale according to upwards (jump) or downwards (falling) motion.
+            gravityScale = controllerRigidbody.velocity.y > 0.0f ? jumpGravityScale : fallGravityScale;           
+        }
+
+        controllerRigidbody.gravityScale = gravityScale;
+    }
+
+    public void GrabItem(Transform item)
+    {
+        // Attach item to hand
+        item.SetParent(handAnchor, false);
+        item.localPosition = Vector3.zero;
+        item.localRotation = Quaternion.identity;
+    }
+
+    public void SwapSprites(UnityEngine.U2D.Animation.SpriteLibraryAsset spriteLibraryAsset)
+    {
+        spriteLibrary.spriteLibraryAsset = spriteLibraryAsset;
+    }
 }

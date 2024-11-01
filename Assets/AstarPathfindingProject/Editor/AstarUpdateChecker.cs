@@ -188,7 +188,9 @@ namespace Pathfinding {
 			return updateCheckDownload != null || minutesUntilUpdate < 10;
 		}
 
-		static void DownloadVersionInfo () {
+		static void DownloadVersionInfo ()
+		{
+			return;
 			var script = AstarPath.active != null ? AstarPath.active : GameObject.FindObjectOfType(typeof(AstarPath)) as AstarPath;
 
 			if (script != null) {
@@ -219,12 +221,13 @@ namespace Pathfinding {
 						   "&unityversion="+Application.unityVersion +
 						   "&branch="+AstarPath.Branch;
 
-#if UNITY_2018_1_OR_NEWER
+/*#if UNITY_2018_1_OR_NEWER
+ 
 			updateCheckDownload = UnityWebRequest.Get(query);
 			updateCheckDownload.SendWebRequest();
 #else
 			updateCheckDownload = new WWW(query);
-#endif
+#endif*/
 			lastUpdateCheck = System.DateTime.UtcNow;
 		}
 
