@@ -1,0 +1,23 @@
+// ColorReduction.compute
+#pragma kernel ColorReduce
+
+// Texture to modify
+RWTexture2D<float4> _SourceTexture;
+
+// Reduction speed factor
+float _ReductionSpeed;
+
+[numthreads(8, 8, 1)]
+void ColorReduce(uint3 id : SV_DispatchThreadID)
+{
+    float2 coords = id.xy;
+    float4 color = _SourceTexture[coords];
+    
+    // Reduce color each frame
+    color -= _ReductionSpeed * 0.01f; 
+
+    // Clamp to prevent negative values
+    color = max(color, 0.0);
+
+    _SourceTexture[coords] = color;
+}

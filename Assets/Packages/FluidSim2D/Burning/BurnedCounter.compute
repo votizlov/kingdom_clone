@@ -1,0 +1,31 @@
+#pragma kernel CountBurned
+
+// The texture we're checking
+Texture2D<float4> _Source;
+
+// The buffer storing our accumulated count
+RWStructuredBuffer<uint> _BurnedCount;
+
+// Threshold for deciding if a pixel is burned
+float _BurnThreshold;
+
+[numthreads(8, 8, 1)]
+void CountBurned(uint3 id : SV_DispatchThreadID)
+{
+    // Compute pixel coordinates
+    uint x = id.x;
+    uint y = id.y;
+
+    // Get pixel color
+    float4 color = _Source.Load(uint3(x, y, 0));
+    
+    // Example: use average brightness
+    //float brightness = color.r;
+
+    // If brightness > threshold => burned
+    if (color.r > _BurnThreshold)
+    {
+        // Atomically increment the counter
+        InterlockedAdd(_BurnedCount[0], 1);
+    }
+}

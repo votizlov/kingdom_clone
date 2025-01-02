@@ -1,8 +1,12 @@
-Shader "Unlit/BurningObject"
+Shader "Custom/BurningObject"
 {
     Properties
     {
-        _MainTex ("Texture", 2D) = "white" {}
+        _MainTex ("Main tex", 2D) = "white" {}
+        _FireTex ("Fire tex", 2D) = "black" {}
+        [Toggle(EMITTER_ON)]
+        _IsEmitter ("IsEmitter", Float) = 0 
+        _BurnedColor("BurnedCol", Color) = (1,1,1,1)
     }
     SubShader
     {
@@ -11,11 +15,11 @@ Shader "Unlit/BurningObject"
 
         Pass
         {
+            Name "test"
             CGPROGRAM
+            #pragma multi_compile _ EMITTER_ON
             #pragma vertex vert
             #pragma fragment frag
-            // make fog work
-            #pragma multi_compile_fog
 
             #include "UnityCG.cginc"
 
@@ -28,7 +32,6 @@ Shader "Unlit/BurningObject"
             struct v2f
             {
                 float2 uv : TEXCOORD0;
-                UNITY_FOG_COORDS(1)
                 float4 vertex : SV_POSITION;
             };
 
@@ -36,23 +39,28 @@ Shader "Unlit/BurningObject"
             float4 _MainTex_ST;
             sampler2D _FireTex;
             float4 _FireTex_ST;
+            float4 _BurnedColor;
 
             v2f vert (appdata v)
             {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-                UNITY_TRANSFER_FOG(o,o.vertex);
                 return o;
             }
 
             fixed4 frag (v2f i) : SV_Target
-            {
-                // project the fire tex, it will show where the fire should be burning. Then use MainTex with already birnt mask. 0 - to a crisp, 1 fill hp. Using some alghorithm apply fire tex, update mask
+            {// 0 - to a crisp, 1 full hp.
+                #if EMITTER_ON
                 fixed4 col = tex2D(_MainTex, i.uv);
-                // apply fog
-                UNITY_APPLY_FOG(i.fogCoord, col);
+                if(col.a<0.1) discard;
+                return float4(tex2D(_FireTex, i.uv).r,0,0,0);
+                #else
+                fixed4 col = tex2D(_MainTex, i.uv);
+                if(col.a<0.1) discard;
+                col*=lerp(float4(1,1,1,1),_BurnedColor,tex2D(_FireTex, i.uv).r);
                 return col;
+                #endif
             }
             ENDCG
         }
