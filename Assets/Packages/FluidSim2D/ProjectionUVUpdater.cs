@@ -49,7 +49,7 @@ public class ProjectionUVUpdater : MonoBehaviour
             var t = CountBurned(burning.renderTexture);
             if (t > 20000)
             {
-                burning.isBurned = true;
+                burning.MarkAsBurned();
                 Debug.Log($"burned! {burning.name} with pixel count {t}");
             }
             //colorReductionShader.SetTexture(kernelID, "_SourceTexture", burning.renderTexture);
