@@ -15,6 +15,7 @@ public class ProjectionUVUpdater : MonoBehaviour
     private uint[] countData = new uint[1];
     private ComputeBuffer countBuffer;
     private List<BurningBehaviour> burningObjects;
+    private int initOffset = 5;
 
     void Start()
     {
@@ -43,10 +44,19 @@ public class ProjectionUVUpdater : MonoBehaviour
     
     void Update()
     {
+        if(initOffset > 0)
+        {
+            initOffset--;
+            return;
+        }
         foreach (var burning in burningObjects)
         {
-            if(burning.isBurned) continue;
-            var t = CountBurned(burning.renderTexture);
+            if (burning.isBurned) continue;
+            var test = burning.GetComponent<BurnCounterTester>();
+            if (test == null)
+                return;
+
+            var t = test.GetBurnedCount();///CountBurned(burning.renderTexture);
             if (t > 20000)
             {
                 burning.isBurned = true;
@@ -157,12 +167,25 @@ public class ProjectionUVUpdater : MonoBehaviour
 
         return count;
     }
-    
+
     /// <summary>
     /// Returns the number of pixels considered "burned."
     /// </summary>
     public uint CountBurned(RenderTexture rt)
-    {
+    {/*
+        EnsureBuffer();
+        countBuffer.SetCounterValue(0);
+
+        burnCounterShader.SetTexture(kernelID, "_Source", rt);
+        burnCounterShader.SetBuffer(kernelID, "_BurnedCount", countBuffer);
+        burnCounterShader.SetFloat("_BurnThreshold", burnThreshold);
+        burnCounterShader.SetInts("_SourceSize", rt.width, rt.height);
+
+        int dispatchX = Mathf.Max(1, Mathf.CeilToInt(rt.width / 8.0f));
+        int dispatchY = Mathf.Max(1, Mathf.CeilToInt(rt.height / 8.0f));
+        burnCounterShader.Dispatch(kernelID, dispatchX, dispatchY, 1);
+
+        countBuffer.GetData(countData);*/
 
         // Reset the buffer counter
         countBuffer.SetCounterValue(0);
@@ -183,6 +206,22 @@ public class ProjectionUVUpdater : MonoBehaviour
 
         // countData[0] now holds the number of burned pixels
         return countData[0];
+    }
+    private void EnsureBuffer()
+    {
+        if (countBuffer == null)
+        {
+            countBuffer = new ComputeBuffer(1, sizeof(uint), ComputeBufferType.Counter);
+        }
+    }
+
+    private void ReleaseBuffer()
+    {
+        if (countBuffer != null)
+        {
+            countBuffer.Release();
+            countBuffer = null;
+        }
     }
     void UpdateOld()
     {
