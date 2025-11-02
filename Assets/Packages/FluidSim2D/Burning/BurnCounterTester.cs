@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class BurnCounterTester : MonoBehaviour
 {
@@ -10,6 +11,8 @@ public class BurnCounterTester : MonoBehaviour
     private uint[] countData = new uint[1];
     private static readonly uint[] Zero = { 0u };
     private int kernelID;
+    private AsyncGPUReadbackRequest burnCountReadbackRequest;
+    private int lastBurnedCount = -1;
 
     private void Awake()
     {
@@ -53,6 +56,34 @@ public class BurnCounterTester : MonoBehaviour
     {
         var comp = GetComponent<BurningBehaviour>();
         targetTexture = comp?.renderTexture;
+        if (!ValidateInputs())
+        {
+            return lastBurnedCount;
+        }
+
+        if (burnCountReadbackRequest.valid && burnCountReadbackRequest.done)
+        {
+            if (burnCountReadbackRequest.hasError)
+            {
+                Debug.LogWarning("AsyncGPUReadback for burn count failed.");
+            }
+            else
+            {
+                var data = burnCountReadbackRequest.GetData<uint>();
+                if (data.Length > 0)
+                {
+                    lastBurnedCount = (int)data[0];
+                }
+            }
+
+            burnCountReadbackRequest = default;
+        }
+
+        if (burnCountReadbackRequest.valid && !burnCountReadbackRequest.done)
+        {
+            return lastBurnedCount;
+        }
+
         EnsureBuffer();
         countBuffer.SetData(Zero);
 
@@ -65,8 +96,9 @@ public class BurnCounterTester : MonoBehaviour
         int dispatchY = Mathf.Max(1, Mathf.CeilToInt(targetTexture.height / 8.0f));
         burnCounterShader.Dispatch(kernelID, dispatchX, dispatchY, 1);
 
-        countBuffer.GetData(countData);
-        return (int)countData[0];
+        burnCountReadbackRequest = AsyncGPUReadback.Request(countBuffer);
+
+        return lastBurnedCount;
     }
 
     private bool ValidateInputs()
@@ -107,6 +139,8 @@ public class BurnCounterTester : MonoBehaviour
 
     private void ReleaseBuffer()
     {
+        burnCountReadbackRequest = default;
+
         if (countBuffer != null)
         {
             countBuffer.Release();
