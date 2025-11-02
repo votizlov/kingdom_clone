@@ -1,7 +1,6 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class BurningBehaviour : MonoBehaviour
 {
@@ -10,11 +9,44 @@ public class BurningBehaviour : MonoBehaviour
     public MeshFilter meshFilter;
     public Camera orthographicCamera;
     public bool isBurned = false;
+    [SerializeField] private BurningData burningData;
+    [SerializeField] private UnityEvent onBurned = new UnityEvent();
+
+    private bool burnEventInvoked;
+
+    public static event Action<BurningBehaviour> Burned;
+
+    public BurningData BurningData => burningData;
+    public UnityEvent OnBurned => onBurned;
 
     private void OnValidate()
     {
         meshRenderer = GetComponent<MeshRenderer>();
         meshFilter = GetComponent<MeshFilter>();
+    }
+
+    public void SetBurningData(BurningData data)
+    {
+        burningData = data;
+    }
+
+    public void MarkAsBurned()
+    {
+        if (isBurned)
+        {
+            return;
+        }
+
+        isBurned = true;
+
+        if (burnEventInvoked)
+        {
+            return;
+        }
+
+        burnEventInvoked = true;
+        onBurned?.Invoke();
+        Burned?.Invoke(this);
     }
     public void DuplicateMeshToChild()
     {
