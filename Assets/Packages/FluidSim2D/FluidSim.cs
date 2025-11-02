@@ -271,11 +271,14 @@ namespace FluidSim2DProject
             {
                 Vector2 pos = Input.mousePosition;
 
-                pos.x -= m_rect.xMin;
-                pos.y -= m_rect.yMin;
+                // Convert the screen space pointer to GUI space so it matches the
+                // coordinates used by the simulation rect, then normalise to [0,1].
+                pos.y = Screen.height - pos.y;
+                pos = Rect.PointToNormalized(m_rect, pos);
+                pos.y = 1.0f - pos.y;
 
-                pos.x /= m_rect.width;
-                pos.y /= m_rect.height;
+                pos.x = Mathf.Clamp01(pos.x);
+                pos.y = Mathf.Clamp01(pos.y);
 
                 float sign = (Input.GetMouseButton(0)) ? 1.0f : -1.0f;
 
