@@ -26,6 +26,8 @@ public class BurnCounterTester : MonoBehaviour
     [ContextMenu("Log Burned Pixel Count")]
     private void LogBurnedPixelCount()
     {
+        var comp = GetComponent<BurningBehaviour>();
+        targetTexture = comp?.renderTexture;
         if (!ValidateInputs())
         {
             return;
@@ -45,6 +47,26 @@ public class BurnCounterTester : MonoBehaviour
 
         countBuffer.GetData(countData);
         Debug.Log($"Burned pixels detected: {countData[0]}");
+    }
+
+    public int GetBurnedCount()
+    {
+        var comp = GetComponent<BurningBehaviour>();
+        targetTexture = comp?.renderTexture;
+        EnsureBuffer();
+        countBuffer.SetCounterValue(0);
+
+        burnCounterShader.SetTexture(kernelID, "_Source", targetTexture);
+        burnCounterShader.SetBuffer(kernelID, "_BurnedCount", countBuffer);
+        burnCounterShader.SetFloat("_BurnThreshold", burnThreshold);
+        burnCounterShader.SetInts("_SourceSize", targetTexture.width, targetTexture.height);
+
+        int dispatchX = Mathf.Max(1, Mathf.CeilToInt(targetTexture.width / 8.0f));
+        int dispatchY = Mathf.Max(1, Mathf.CeilToInt(targetTexture.height / 8.0f));
+        burnCounterShader.Dispatch(kernelID, dispatchX, dispatchY, 1);
+
+        countBuffer.GetData(countData);
+        return (int)countData[0];
     }
 
     private bool ValidateInputs()

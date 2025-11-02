@@ -1,6 +1,6 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class BurningShopView : MonoBehaviour
 {
@@ -9,7 +9,7 @@ public class BurningShopView : MonoBehaviour
     [SerializeField] private Transform contentRoot;
     [SerializeField] private BurningShopItemView itemViewPrefab;
     [SerializeField] private List<BurningData> burningItems = new List<BurningData>();
-    [SerializeField] private Text pointsLabel;
+    [SerializeField] private TMP_Text pointsLabel;
     [SerializeField] private Transform spawnTransform;
     [SerializeField] private Transform spawnParent;
     [SerializeField] private int defaultBurnReward = 1;

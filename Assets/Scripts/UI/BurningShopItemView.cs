@@ -1,11 +1,12 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class BurningShopItemView : MonoBehaviour
 {
     [SerializeField] private Image iconImage;
-    [SerializeField] private Text buyCostLabel;
+    [SerializeField] private TMP_Text buyCostLabel;
     [SerializeField] private Button buyButton;
 
     private BurningData burningData;
