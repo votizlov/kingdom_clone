@@ -171,11 +171,12 @@ public class ProjectionUVUpdater : MonoBehaviour
         burnCounterShader.SetTexture(kernelID, "_Source", rt);
         burnCounterShader.SetBuffer(kernelID, "_BurnedCount", countBuffer);
         burnCounterShader.SetFloat("_BurnThreshold", burnThreshold);
+        burnCounterShader.SetInts("_SourceSize", rt.width, rt.height);
 
         // Dispatch threads over the entire texture
-        //int threadGroupX = Mathf.CeilToInt(rt.width / 8.0f);
-        //int threadGroupY = Mathf.CeilToInt(rt.height / 8.0f);
-        burnCounterShader.Dispatch(kernelID, 32, 32, 1);
+        int threadGroupX = Mathf.Max(1, Mathf.CeilToInt(rt.width / 8.0f));
+        int threadGroupY = Mathf.Max(1, Mathf.CeilToInt(rt.height / 8.0f));
+        burnCounterShader.Dispatch(kernelID, threadGroupX, threadGroupY, 1);
 
         // Get the counter value from the GPU (we're only reading back 1 integer)
         countBuffer.GetData(countData);

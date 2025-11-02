@@ -9,12 +9,20 @@ RWStructuredBuffer<uint> _BurnedCount;
 // Threshold for deciding if a pixel is burned
 float _BurnThreshold;
 
+int2 _SourceSize;
+
 [numthreads(8, 8, 1)]
 void CountBurned(uint3 id : SV_DispatchThreadID)
 {
     // Compute pixel coordinates
     uint x = id.x;
     uint y = id.y;
+
+    // Abort if the thread is outside of the texture bounds
+    if (x >= _SourceSize.x || y >= _SourceSize.y)
+    {
+        return;
+    }
 
     // Get pixel color
     float4 color = _Source.Load(uint3(x, y, 0));
