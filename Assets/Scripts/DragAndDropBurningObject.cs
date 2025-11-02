@@ -103,7 +103,7 @@ public class DragAndDropBurningObject : MonoBehaviour, IPointerDownHandler, IPoi
         {
             hadRigidbody = true;
             originalBodyType = spawnedRigidbody.bodyType;
-            spawnedRigidbody.velocity = Vector2.zero;
+            spawnedRigidbody.linearVelocity = Vector2.zero;
             spawnedRigidbody.angularVelocity = 0f;
             spawnedRigidbody.bodyType = RigidbodyType2D.Kinematic;
         }
