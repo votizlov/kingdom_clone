@@ -8,6 +8,7 @@ public class BurnCounterTester : MonoBehaviour
 
     private ComputeBuffer countBuffer;
     private uint[] countData = new uint[1];
+    private static readonly uint[] Zero = { 0u };
     private int kernelID;
 
     private void Awake()
@@ -34,7 +35,7 @@ public class BurnCounterTester : MonoBehaviour
         }
 
         EnsureBuffer();
-        countBuffer.SetCounterValue(0);
+        countBuffer.SetData(Zero);
 
         burnCounterShader.SetTexture(kernelID, "_Source", targetTexture);
         burnCounterShader.SetBuffer(kernelID, "_BurnedCount", countBuffer);
@@ -46,7 +47,6 @@ public class BurnCounterTester : MonoBehaviour
         burnCounterShader.Dispatch(kernelID, dispatchX, dispatchY, 1);
 
         countBuffer.GetData(countData);
-        Debug.Log($"Burned pixels detected: {countData[0]}");
     }
 
     public int GetBurnedCount()
@@ -54,7 +54,7 @@ public class BurnCounterTester : MonoBehaviour
         var comp = GetComponent<BurningBehaviour>();
         targetTexture = comp?.renderTexture;
         EnsureBuffer();
-        countBuffer.SetCounterValue(0);
+        countBuffer.SetData(Zero);
 
         burnCounterShader.SetTexture(kernelID, "_Source", targetTexture);
         burnCounterShader.SetBuffer(kernelID, "_BurnedCount", countBuffer);
@@ -101,7 +101,7 @@ public class BurnCounterTester : MonoBehaviour
     {
         if (countBuffer == null)
         {
-            countBuffer = new ComputeBuffer(1, sizeof(uint), ComputeBufferType.Counter);
+            countBuffer = new ComputeBuffer(1, sizeof(uint), ComputeBufferType.Structured);
         }
     }
 
