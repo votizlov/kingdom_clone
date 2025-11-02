@@ -217,6 +217,18 @@ namespace FluidSim2DProject
             texs[1] = temp;
         }
 
+        Vector2 ConvertScreenToSimulation(Vector2 screenPos)
+        {
+            screenPos.y = Screen.height - screenPos.y;
+            screenPos = Rect.PointToNormalized(m_rect, screenPos);
+            screenPos.y = 1.0f - screenPos.y;
+
+            screenPos.x = Mathf.Clamp01(screenPos.x);
+            screenPos.y = Mathf.Clamp01(screenPos.y);
+
+            return screenPos;
+        }
+
         void FixedUpdate()
         {
             //Obstacles only need to be added once unless changed.
@@ -269,16 +281,7 @@ namespace FluidSim2DProject
             //If left click down add impluse, if right click down remove impulse from mouse pos.
             if(Input.GetMouseButton(0) || Input.GetMouseButton(1))
             {
-                Vector2 pos = Input.mousePosition;
-
-                // Convert the screen space pointer to GUI space so it matches the
-                // coordinates used by the simulation rect, then normalise to [0,1].
-                pos.y = Screen.height - pos.y;
-                pos = Rect.PointToNormalized(m_rect, pos);
-                pos.y = 1.0f - pos.y;
-
-                pos.x = Mathf.Clamp01(pos.x);
-                pos.y = Mathf.Clamp01(pos.y);
+                Vector2 pos = ConvertScreenToSimulation(Input.mousePosition);
 
                 float sign = (Input.GetMouseButton(0)) ? 1.0f : -1.0f;
 
@@ -287,6 +290,31 @@ namespace FluidSim2DProject
 
                 Swap(m_temperatureTex);
                 Swap(m_densityTex);
+            }
+
+            if (Touchscreen.current != null)
+            {
+                foreach (var touch in Touchscreen.current.touches)
+                {
+                    if (!touch.press.isPressed)
+                    {
+                        continue;
+                    }
+
+                    var phase = touch.phase.ReadValue();
+                    if (phase == UnityEngine.InputSystem.TouchPhase.Canceled || phase == UnityEngine.InputSystem.TouchPhase.Ended)
+                    {
+                        continue;
+                    }
+
+                    Vector2 pos = ConvertScreenToSimulation(touch.position.ReadValue());
+
+                    ApplyImpulse(m_temperatureTex[READ], m_temperatureTex[WRITE], pos, m_mouseImpluseRadius, m_impulseTemperature);
+                    ApplyImpulse(m_densityTex[READ], m_densityTex[WRITE], pos, m_mouseImpluseRadius, m_impulseDensity);
+
+                    Swap(m_temperatureTex);
+                    Swap(m_densityTex);
+                }
             }
 
             //Calculates how divergent the velocity is
