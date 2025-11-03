@@ -30,17 +30,45 @@ public class ProjectionUVUpdater : MonoBehaviour
             burning.meshRenderer.material = matInstance;
             var tex = matInstance.GetTexture("_MainTex");
             Bounds bounds = burning.meshFilter.sharedMesh.bounds;
-            burning.renderTexture = new RenderTexture(Mathf.RoundToInt(bounds.size.x*burning.transform.localScale.x*texMultiplier),
-                Mathf.RoundToInt(bounds.size.y*burning.transform.localScale.x*texMultiplier), 0,GraphicsFormat.R8_UNorm);
+
+            var targetFormat = GetSupportedFireTextureFormat();
+            var descriptor = new RenderTextureDescriptor(
+                Mathf.RoundToInt(bounds.size.x * burning.transform.localScale.x * texMultiplier),
+                Mathf.RoundToInt(bounds.size.y * burning.transform.localScale.x * texMultiplier))
+            {
+                depthBufferBits = 0,
+                graphicsFormat = targetFormat,
+                msaaSamples = 1,
+                sRGB = false
+            };
+
+            burning.renderTexture = new RenderTexture(descriptor);
             //burning.renderTexture.enableRandomWrite = true;
             burning.renderTexture.Create();
             ClearRenderTexture(burning.renderTexture);
-            Debug.Log($"created texture with dimensions: {burning.renderTexture.width} / {burning.renderTexture.height}");
+            Debug.Log($"created texture with dimensions: {burning.renderTexture.width} / {burning.renderTexture.height} using format {targetFormat}");
             matInstance.SetTexture("_FireTex",burning.renderTexture);
             
             CreateOrthographicCamera(burning);
             DuplicateMeshToChild(burning);
         }
+    }
+
+    private static GraphicsFormat GetSupportedFireTextureFormat()
+    {
+        var desiredFormat = GraphicsFormat.R8_UNorm;
+        if (SystemInfo.IsFormatSupported(desiredFormat, FormatUsage.Render))
+        {
+            return desiredFormat;
+        }
+
+        var fallbackFormat = GraphicsFormat.R8G8B8A8_UNorm;
+        if (SystemInfo.IsFormatSupported(fallbackFormat, FormatUsage.Render))
+        {
+            return fallbackFormat;
+        }
+
+        return GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
     }
 
     private static void ClearRenderTexture(RenderTexture renderTexture)
