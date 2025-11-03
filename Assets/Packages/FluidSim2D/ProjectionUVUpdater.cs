@@ -34,12 +34,26 @@ public class ProjectionUVUpdater : MonoBehaviour
                 Mathf.RoundToInt(bounds.size.y*burning.transform.localScale.x*texMultiplier), 0,GraphicsFormat.R8_UNorm);
             //burning.renderTexture.enableRandomWrite = true;
             burning.renderTexture.Create();
+            ClearRenderTexture(burning.renderTexture);
             Debug.Log($"created texture with dimensions: {burning.renderTexture.width} / {burning.renderTexture.height}");
             matInstance.SetTexture("_FireTex",burning.renderTexture);
             
             CreateOrthographicCamera(burning);
             DuplicateMeshToChild(burning);
         }
+    }
+
+    private static void ClearRenderTexture(RenderTexture renderTexture)
+    {
+        if (renderTexture == null)
+        {
+            return;
+        }
+
+        var previous = RenderTexture.active;
+        RenderTexture.active = renderTexture;
+        GL.Clear(false, true, Color.black);
+        RenderTexture.active = previous;
     }
     
     void Update()
