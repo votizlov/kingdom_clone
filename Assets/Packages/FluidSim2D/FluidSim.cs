@@ -54,8 +54,8 @@ namespace FluidSim2DProject
  
         void Start()
         {
-            m_width = 1280;
-            m_height = 720;
+            m_width = Mathf.Max(1, Screen.width / 2);
+            m_height = Mathf.Max(1, Screen.height / 2);
 
             Vector2 size = new Vector2(m_width, m_height);
             Vector2 pos = new Vector2(Screen.width / 2, Screen.height / 2) - size * 0.5f;
