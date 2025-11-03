@@ -13,6 +13,7 @@ public class BurnCounterTester : MonoBehaviour
     private int kernelID;
     private AsyncGPUReadbackRequest burnCountReadbackRequest;
     private int lastBurnedCount = -1;
+    private bool isRequestPending = false;
 
     private void Awake()
     {
@@ -61,8 +62,9 @@ public class BurnCounterTester : MonoBehaviour
             return lastBurnedCount;
         }
 
-        if (burnCountReadbackRequest.valid && burnCountReadbackRequest.done)
+        if (isRequestPending && burnCountReadbackRequest.done)
         {
+            isRequestPending = false;
             if (burnCountReadbackRequest.hasError)
             {
                 Debug.LogWarning("AsyncGPUReadback for burn count failed.");
@@ -79,7 +81,7 @@ public class BurnCounterTester : MonoBehaviour
             burnCountReadbackRequest = default;
         }
 
-        if (burnCountReadbackRequest.valid && !burnCountReadbackRequest.done)
+        if (isRequestPending &&!burnCountReadbackRequest.done)
         {
             return lastBurnedCount;
         }
@@ -97,6 +99,7 @@ public class BurnCounterTester : MonoBehaviour
         burnCounterShader.Dispatch(kernelID, dispatchX, dispatchY, 1);
 
         burnCountReadbackRequest = AsyncGPUReadback.Request(countBuffer);
+        isRequestPending = true;
 
         return lastBurnedCount;
     }

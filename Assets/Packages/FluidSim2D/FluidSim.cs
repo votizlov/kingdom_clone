@@ -279,7 +279,7 @@ namespace FluidSim2DProject
             Swap(m_densityTex);
 
             //If left click down add impluse, if right click down remove impulse from mouse pos.
-            if(Input.GetMouseButton(0) || Input.GetMouseButton(1))
+            /*if(Input.GetMouseButton(0) || Input.GetMouseButton(1))
             {
                 Vector2 pos = ConvertScreenToSimulation(Input.mousePosition);
 
@@ -290,7 +290,7 @@ namespace FluidSim2DProject
 
                 Swap(m_temperatureTex);
                 Swap(m_densityTex);
-            }
+            }*/
 
             if (Touchscreen.current != null)
             {

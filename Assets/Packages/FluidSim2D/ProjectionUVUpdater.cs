@@ -57,7 +57,7 @@ public class ProjectionUVUpdater : MonoBehaviour
                 return;
 
             var t = test.GetBurnedCount();///CountBurned(burning.renderTexture);
-            if (t > 20000)
+            if (t > 5000)
             {
                 burning.MarkAsBurned();
                 Debug.Log($"burned! {burning.name} with pixel count {t}");
