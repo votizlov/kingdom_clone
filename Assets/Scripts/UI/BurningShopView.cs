@@ -13,6 +13,7 @@ public class BurningShopView : MonoBehaviour
     [SerializeField] private Transform spawnTransform;
     [SerializeField] private Transform spawnParent;
     [SerializeField] private int defaultBurnReward = 1;
+    [SerializeField] private BurningStashView stashView;
 
     private readonly List<ItemBinding> itemBindings = new List<ItemBinding>();
     private int currentPoints;
@@ -20,6 +21,10 @@ public class BurningShopView : MonoBehaviour
     private void Awake()
     {
         LoadPoints();
+        if (stashView != null)
+        {
+            stashView.SetAvailableItems(burningItems);
+        }
         BuildShop();
         RefreshPointsLabel();
         UpdateItemInteractivity();
@@ -88,7 +93,15 @@ public class BurningShopView : MonoBehaviour
         }
 
         SpendPoints(data.BuyCost);
-        SpawnBurningObject(data);
+
+        if (stashView != null)
+        {
+            stashView.AddItem(data);
+        }
+        else
+        {
+            SpawnBurningObject(data);
+        }
     }
 
     private void SpawnBurningObject(BurningData data)
