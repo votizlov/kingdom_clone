@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -34,10 +35,25 @@ public class DragAndDropBurningObject : MonoBehaviour, IPointerDownHandler, IPoi
     private RigidbodyType2D originalBodyType;
     private bool hadRigidbody;
 
+    public event Action<bool> DragCompleted;
+
+    public void Configure(RectTransform newDropArea, GameObject prefab, Camera camera)
+    {
+        dropArea = newDropArea;
+        burningObjectPrefab = prefab;
+        worldCamera = camera;
+    }
+
     public void OnPointerDown(PointerEventData eventData)
     {
         if (isDragging)
             return;
+
+        if (burningObjectPrefab == null)
+        {
+            Debug.LogWarning("DragAndDropBurningObject requires a prefab to spawn.");
+            return;
+        }
 
         isDragging = true;
         activePointerId = eventData.pointerId;
@@ -71,12 +87,14 @@ public class DragAndDropBurningObject : MonoBehaviour, IPointerDownHandler, IPoi
             return;
 
         bool overDropArea = IsPointerOverDropArea(eventData);
+        bool completed = false;
 
         if (spawnedObject != null)
         {
             if (overDropArea)
             {
                 ReleaseSpawnedObject();
+                completed = true;
             }
             else
             {
@@ -84,17 +102,13 @@ public class DragAndDropBurningObject : MonoBehaviour, IPointerDownHandler, IPoi
             }
         }
 
+        DragCompleted?.Invoke(completed);
+
         ResetDragState();
     }
 
     private void SpawnObject(PointerEventData eventData)
     {
-        if (burningObjectPrefab == null)
-        {
-            Debug.LogWarning("DragAndDropBurningObject requires a prefab to spawn.");
-            return;
-        }
-
         spawnedObject = Instantiate(burningObjectPrefab);
         UpdateSpawnedObjectPosition(eventData);
 
