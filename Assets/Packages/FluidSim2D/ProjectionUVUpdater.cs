@@ -17,40 +17,19 @@ public class ProjectionUVUpdater : MonoBehaviour
     private List<BurningBehaviour> burningObjects;
     private int initOffset = 5;
 
+    private void Awake()
+    {
+        burningObjects = new List<BurningBehaviour>();
+    }
+
     void Start()
     {
         kernelID = burnCounterShader.FindKernel("CountBurned");
         countBuffer = new ComputeBuffer(1, sizeof(uint), ComputeBufferType.Counter);
 
-        burningObjects = new List<BurningBehaviour>(FindObjectsOfType<BurningBehaviour>());
-
-        foreach (var burning in burningObjects)
+        foreach (var burning in FindObjectsOfType<BurningBehaviour>())
         {
-            Material matInstance = new Material(burning.meshRenderer.sharedMaterial);
-            burning.meshRenderer.material = matInstance;
-            var tex = matInstance.GetTexture("_MainTex");
-            Bounds bounds = burning.meshFilter.sharedMesh.bounds;
-
-            var targetFormat = GetSupportedFireTextureFormat();
-            var descriptor = new RenderTextureDescriptor(
-                Mathf.RoundToInt(bounds.size.x * burning.transform.localScale.x * texMultiplier),
-                Mathf.RoundToInt(bounds.size.y * burning.transform.localScale.x * texMultiplier))
-            {
-                depthBufferBits = 0,
-                graphicsFormat = targetFormat,
-                msaaSamples = 1,
-                sRGB = false
-            };
-
-            burning.renderTexture = new RenderTexture(descriptor);
-            //burning.renderTexture.enableRandomWrite = true;
-            burning.renderTexture.Create();
-            ClearRenderTexture(burning.renderTexture);
-            Debug.Log($"created texture with dimensions: {burning.renderTexture.width} / {burning.renderTexture.height} using format {targetFormat}");
-            matInstance.SetTexture("_FireTex",burning.renderTexture);
-            
-            CreateOrthographicCamera(burning);
-            DuplicateMeshToChild(burning);
+            Track(burning);
         }
     }
 
@@ -69,6 +48,102 @@ public class ProjectionUVUpdater : MonoBehaviour
         }
 
         return GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+    }
+
+    public void Track(BurningBehaviour burning)
+    {
+        if (burningObjects == null)
+        {
+            burningObjects = new List<BurningBehaviour>();
+        }
+
+        if (burning == null || burningObjects.Contains(burning))
+        {
+            return;
+        }
+
+        if (burning.meshRenderer == null)
+        {
+            burning.meshRenderer = burning.GetComponent<MeshRenderer>();
+        }
+
+        if (burning.meshFilter == null)
+        {
+            burning.meshFilter = burning.GetComponent<MeshFilter>();
+        }
+
+        if (burning.meshRenderer == null || burning.meshFilter == null)
+        {
+            Debug.LogWarning("Cannot track burning object without MeshRenderer and MeshFilter components.");
+            return;
+        }
+
+        var sharedMaterial = burning.meshRenderer.sharedMaterial;
+        if (sharedMaterial == null)
+        {
+            Debug.LogWarning("Cannot track burning object without a shared material.");
+            return;
+        }
+
+        if (burning.renderTexture != null)
+        {
+            burning.renderTexture.Release();
+            Destroy(burning.renderTexture);
+            burning.renderTexture = null;
+        }
+
+        Material matInstance = new Material(sharedMaterial);
+        burning.meshRenderer.material = matInstance;
+
+        var sharedMesh = burning.meshFilter.sharedMesh;
+        if (sharedMesh == null)
+        {
+            Debug.LogWarning("Cannot track burning object without a shared mesh.");
+            return;
+        }
+
+        Bounds bounds = sharedMesh.bounds;
+
+        var targetFormat = GetSupportedFireTextureFormat();
+        var descriptor = new RenderTextureDescriptor(
+            Mathf.RoundToInt(bounds.size.x * burning.transform.localScale.x * texMultiplier),
+            Mathf.RoundToInt(bounds.size.y * burning.transform.localScale.x * texMultiplier))
+        {
+            depthBufferBits = 0,
+            graphicsFormat = targetFormat,
+            msaaSamples = 1,
+            sRGB = false
+        };
+
+        burning.renderTexture = new RenderTexture(descriptor);
+        burning.renderTexture.Create();
+        ClearRenderTexture(burning.renderTexture);
+        Debug.Log($"created texture with dimensions: {burning.renderTexture.width} / {burning.renderTexture.height} using format {targetFormat}");
+        matInstance.SetTexture("_FireTex", burning.renderTexture);
+
+        CreateOrthographicCamera(burning);
+        DuplicateMeshToChild(burning);
+
+        burningObjects.Add(burning);
+    }
+
+    public void Untrack(BurningBehaviour burning)
+    {
+        if (burning == null)
+        {
+            return;
+        }
+
+        burningObjects?.Remove(burning);
+
+        if (burning.renderTexture != null)
+        {
+            burning.renderTexture.Release();
+            Destroy(burning.renderTexture);
+            burning.renderTexture = null;
+        }
+
+        Destroy(burning.gameObject);
     }
 
     private static void ClearRenderTexture(RenderTexture renderTexture)
