@@ -13,6 +13,7 @@ public class BurningShopView : MonoBehaviour
     [SerializeField] private Transform spawnTransform;
     [SerializeField] private Transform spawnParent;
     [SerializeField] private int defaultBurnReward = 1;
+    [SerializeField] private ComboManager comboManager;
     [SerializeField] private BurningStashView stashView;
 
     private readonly List<ItemBinding> itemBindings = new List<ItemBinding>();
@@ -20,6 +21,10 @@ public class BurningShopView : MonoBehaviour
 
     private void Awake()
     {
+        if (comboManager == null)
+        {
+            comboManager = FindObjectOfType<ComboManager>();
+        }
         LoadPoints();
         if (stashView != null)
         {
@@ -33,11 +38,19 @@ public class BurningShopView : MonoBehaviour
     private void OnEnable()
     {
         BurningBehaviour.Burned += HandleBurned;
+        if (comboManager != null)
+        {
+            comboManager.ComboPointsAwarded += HandleComboPointsAwarded;
+        }
     }
 
     private void OnDisable()
     {
         BurningBehaviour.Burned -= HandleBurned;
+        if (comboManager != null)
+        {
+            comboManager.ComboPointsAwarded -= HandleComboPointsAwarded;
+        }
     }
 
     private void LoadPoints()
@@ -127,6 +140,11 @@ public class BurningShopView : MonoBehaviour
             : defaultBurnReward;
 
         AddPoints(reward);
+    }
+
+    private void HandleComboPointsAwarded(int points)
+    {
+        AddPoints(points);
     }
 
     private void AddPoints(int amount)

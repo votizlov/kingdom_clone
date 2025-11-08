@@ -11,6 +11,7 @@ public class ProjectionUVUpdater : MonoBehaviour
     [SerializeField] private float reductionSpeed = 0.05f;
     [SerializeField] private ComputeShader burnCounterShader;
     [SerializeField] private float burnThreshold = 0.5f;
+    [SerializeField] private ComboManager comboManager;
     private int kernelID;
     private uint[] countData = new uint[1];
     private ComputeBuffer countBuffer;
@@ -20,6 +21,10 @@ public class ProjectionUVUpdater : MonoBehaviour
     private void Awake()
     {
         burningObjects = new List<BurningBehaviour>();
+        if (comboManager == null)
+        {
+            comboManager = FindObjectOfType<ComboManager>();
+        }
     }
 
     void Start()
@@ -177,6 +182,7 @@ public class ProjectionUVUpdater : MonoBehaviour
             if (t > 5000)
             {
                 burning.MarkAsBurned();
+                comboManager?.NotifyBurned(burning);
                 Debug.Log($"burned! {burning.name} with pixel count {t}");
             }
             //colorReductionShader.SetTexture(kernelID, "_SourceTexture", burning.renderTexture);
