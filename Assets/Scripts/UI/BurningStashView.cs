@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class BurningStashView : MonoBehaviour
 {
@@ -11,10 +12,13 @@ public class BurningStashView : MonoBehaviour
     [SerializeField] private RectTransform dropArea;
     [SerializeField] private Camera worldCamera;
     [SerializeField] private List<BurningData> initialAvailableItems = new List<BurningData>();
+    [SerializeField] private UnityEvent<BurningData> onItemPlaced = new UnityEvent<BurningData>();
 
     private readonly List<string> ownedItemIds = new List<string>();
     private readonly List<BurningStashItemView> activeItemViews = new List<BurningStashItemView>();
     private readonly Dictionary<string, BurningData> availableItems = new Dictionary<string, BurningData>();
+
+    public UnityEvent<BurningData> OnItemPlaced => onItemPlaced;
 
     private void Awake()
     {
@@ -178,7 +182,10 @@ public class BurningStashView : MonoBehaviour
         }
 
         activeItemViews.Remove(view);
+        var data = view.Data;
         Destroy(view.gameObject);
+
+        onItemPlaced?.Invoke(data);
     }
 
     private bool RemoveFirstOwnedItem(string id)
