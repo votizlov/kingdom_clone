@@ -1,7 +1,10 @@
 
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.EnhancedTouch;
+using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
 
 namespace FluidSim2DProject
 {
@@ -46,6 +49,8 @@ namespace FluidSim2DProject
         [SerializeField] private bool isImpulseFromTex = false;
         [SerializeField] private bool isDrawDebugGUI = false;
         public Texture customImpulseTex;
+
+        public bool allowTouchEmission = true;
 
         public void DebugToggleImpulseFromTex(InputAction.CallbackContext context)
         {
@@ -229,6 +234,20 @@ namespace FluidSim2DProject
             return screenPos;
         }
 
+        List<Vector2> _touchBuffer = new List<Vector2>(8);
+
+        void Update()
+        {
+            _touchBuffer.Clear();
+            foreach (var t in UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches)
+            {
+                if (t.phase == UnityEngine.InputSystem.TouchPhase.Began ||
+                    t.phase == UnityEngine.InputSystem.TouchPhase.Moved ||
+                    t.phase == UnityEngine.InputSystem.TouchPhase.Stationary)
+                    _touchBuffer.Add(ConvertScreenToSimulation(t.screenPosition));
+            }
+        }
+
         void FixedUpdate()
         {
             //Obstacles only need to be added once unless changed.
@@ -292,7 +311,7 @@ namespace FluidSim2DProject
                 Swap(m_densityTex);
             }*/
 
-            if (Touchscreen.current != null)
+            if (Touchscreen.current != null && allowTouchEmission)
             {
                 foreach (var touch in Touchscreen.current.touches)
                 {
@@ -315,6 +334,15 @@ namespace FluidSim2DProject
                     Swap(m_temperatureTex);
                     Swap(m_densityTex);
                 }
+            }
+            for (int j = 0; j < _touchBuffer.Count; j++)
+            {
+                if (!allowTouchEmission) break;
+                var pos = _touchBuffer[j];
+                ApplyImpulse(m_temperatureTex[0], m_temperatureTex[1], pos, m_mouseImpluseRadius, m_impulseTemperature);
+                ApplyImpulse(m_densityTex[0],     m_densityTex[1],     pos, m_mouseImpluseRadius, m_impulseDensity);
+                Swap(m_temperatureTex);
+                Swap(m_densityTex);
             }
 
             //Calculates how divergent the velocity is

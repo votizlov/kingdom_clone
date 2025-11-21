@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 public class ProjectionUVUpdater : MonoBehaviour
 {
@@ -11,7 +12,13 @@ public class ProjectionUVUpdater : MonoBehaviour
     [SerializeField] private float reductionSpeed = 0.05f;
     [SerializeField] private ComputeShader burnCounterShader;
     [SerializeField] private float burnThreshold = 0.5f;
+    [SerializeField, Range(0f, 1f)] private float burnedPixelsPercentToTrigger = 0.5f;
     [SerializeField] private ComboManager comboManager;
+    [SerializeField] private GameObject burnedEffectPrefab;
+    [SerializeField] private Transform collisionPlane;
+    [SerializeField] private FluidSim2DProject.FluidSim fluidSim;
+    [SerializeField] private TouchPhysicsDragger touchDragger;
+    [SerializeField] private BurningShopView shopView;
     private int kernelID;
     private uint[] countData = new uint[1];
     private ComputeBuffer countBuffer;
@@ -25,6 +32,9 @@ public class ProjectionUVUpdater : MonoBehaviour
         {
             comboManager = FindObjectOfType<ComboManager>();
         }
+        if (fluidSim == null) fluidSim = FindObjectOfType<FluidSim2DProject.FluidSim>();
+        if (touchDragger == null) touchDragger = FindObjectOfType<TouchPhysicsDragger>();
+        if (shopView == null) shopView = FindObjectOfType<BurningShopView>();
     }
 
     void Start()
@@ -67,22 +77,6 @@ public class ProjectionUVUpdater : MonoBehaviour
             return;
         }
 
-        if (burning.meshRenderer == null)
-        {
-            burning.meshRenderer = burning.GetComponent<MeshRenderer>();
-        }
-
-        if (burning.meshFilter == null)
-        {
-            burning.meshFilter = burning.GetComponent<MeshFilter>();
-        }
-
-        if (burning.meshRenderer == null || burning.meshFilter == null)
-        {
-            Debug.LogWarning("Cannot track burning object without MeshRenderer and MeshFilter components.");
-            return;
-        }
-
         var sharedMaterial = burning.meshRenderer.sharedMaterial;
         if (sharedMaterial == null)
         {
@@ -100,14 +94,14 @@ public class ProjectionUVUpdater : MonoBehaviour
         Material matInstance = new Material(sharedMaterial);
         burning.meshRenderer.material = matInstance;
 
-        var sharedMesh = burning.meshFilter.sharedMesh;
+        /*var sharedMesh = burning.meshFilter.sharedMesh;
         if (sharedMesh == null)
         {
             Debug.LogWarning("Cannot track burning object without a shared mesh.");
             return;
-        }
+        }*/
 
-        Bounds bounds = sharedMesh.bounds;
+        Bounds bounds = burning.meshRenderer.bounds;
 
         var targetFormat = GetSupportedFireTextureFormat();
         var descriptor = new RenderTextureDescriptor(
@@ -128,6 +122,7 @@ public class ProjectionUVUpdater : MonoBehaviour
 
         CreateOrthographicCamera(burning);
         DuplicateMeshToChild(burning);
+        burning.RecalculateBurnRequirement(burnedPixelsPercentToTrigger);
 
         burningObjects.Add(burning);
     }
@@ -166,24 +161,36 @@ public class ProjectionUVUpdater : MonoBehaviour
     
     void Update()
     {
+        if (fluidSim != null)
+        {
+            bool isShopOpen = shopView != null && shopView.contentRoot.gameObject.activeInHierarchy;
+            bool isDragging = touchDragger != null && touchDragger.IsDraggingObject;
+            fluidSim.allowTouchEmission = !isShopOpen && !isDragging;
+            // Debug.Log($"Emission: {fluidSim.allowTouchEmission}, ShopOpen: {isShopOpen} (View: {shopView}), Dragging: {isDragging}");
+        }
         if(initOffset > 0)
         {
             initOffset--;
             return;
         }
-        foreach (var burning in burningObjects)
+        for (int i= burningObjects.Count-1; i>=0; i--)
         {
+            var burning = burningObjects[i];
             if (burning.isBurned) continue;
             var test = burning.GetComponent<BurnCounterTester>();
             if (test == null)
                 return;
 
-            var t = test.GetBurnedCount();///CountBurned(burning.renderTexture);
-            if (t > 5000)
+            burning.RecalculateBurnRequirement(burnedPixelsPercentToTrigger);
+            var burnedPixels = test.GetBurnedCount();
+            if (burnedPixels >= burning.BurnedPixelsToTrigger && burnedPixels >= 0)
             {
                 burning.MarkAsBurned();
                 comboManager?.NotifyBurned(burning);
-                Debug.Log($"burned! {burning.name} with pixel count {t}");
+                var pt = Instantiate(burnedEffectPrefab, burning.transform.position, Quaternion.identity);
+                pt.GetComponent<ParticleSystem>().collision.SetPlane(0, collisionPlane);
+                Untrack(burning);
+                Debug.Log($"burned! {burning.name} with pixel count {burnedPixels}");
             }
             //colorReductionShader.SetTexture(kernelID, "_SourceTexture", burning.renderTexture);
             //colorReductionShader.SetFloat("_ReductionSpeed", reductionSpeed);
@@ -205,17 +212,15 @@ public class ProjectionUVUpdater : MonoBehaviour
         childObj.transform.SetParent(burning.transform);
         childObj.transform.localPosition = Vector3.zero;
         childObj.transform.localRotation = Quaternion.identity;
-        childObj.transform.localScale = Vector3.one;
+        childObj.transform.localScale = burning.meshRenderer.transform.localScale;
         childObj.layer = LayerMask.NameToLayer("2DFluid");
 
         // Add and setup MeshFilter
-        MeshFilter newMeshFilter = childObj.AddComponent<MeshFilter>();
-        newMeshFilter.sharedMesh = burning.meshFilter.sharedMesh;
+        var newMeshFilter = childObj.AddComponent<SpriteRenderer>();
+        newMeshFilter.sprite = burning.meshRenderer.sprite;
+        newMeshFilter.material = Instantiate(burning.meshRenderer.material);
 
-        // Add and setup MeshRenderer
-        MeshRenderer newMeshRenderer = childObj.AddComponent<MeshRenderer>();
-        newMeshRenderer.material = burning.meshRenderer.material;
-        newMeshRenderer.material.shader = Shader.Find("Custom/BurningEmitter");
+        newMeshFilter.sharedMaterial.shader = Shader.Find("Custom/BurningEmitter");
     }
     
     void CreateOrthographicCamera(BurningBehaviour burning)
@@ -242,10 +247,11 @@ public class ProjectionUVUpdater : MonoBehaviour
             Debug.Log($"set tgt {burning.renderTexture}");
             burning.orthographicCamera.nearClipPlane = -10f;
             burning.orthographicCamera.farClipPlane = 10f;
+            burning.orthographicCamera.GetUniversalAdditionalCameraData().renderShadows = false;
         }
 
         // Calculate the orthographic size and position based on the mesh's bounding box
-        Bounds bounds = burning.meshFilter.sharedMesh.bounds;
+        Bounds bounds = burning.meshRenderer.bounds;
 
         // Only consider the XY plane (side scroller)
         float sizeX = bounds.size.x * burning.transform.localScale.x;
@@ -258,10 +264,10 @@ public class ProjectionUVUpdater : MonoBehaviour
         Vector3 localCenter = bounds.center;
         Vector3 worldCenter = burning.transform.TransformPoint(localCenter);
 
-        burning.orthographicCamera.transform.position = new Vector3(
-            worldCenter.x,
-            worldCenter.y,
-            transform.position.z + 5f // Adjust z position as needed
+        burning.orthographicCamera.transform.localPosition = new Vector3(
+            0,
+            0,
+            3f // Adjust z position as needed
         );
 
         burning.orthographicCamera.transform.rotation = Quaternion.Euler(0f, 0f, 0f); // Looking along the Z-axis

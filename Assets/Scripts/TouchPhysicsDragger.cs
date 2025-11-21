@@ -24,6 +24,7 @@ public class TouchPhysicsDragger : MonoBehaviour
     private bool layerChanged;
 
     private bool IsDragging => grabbedRigidbody != null;
+    public bool IsDraggingObject => IsDragging;
 
     private void Update()
     {

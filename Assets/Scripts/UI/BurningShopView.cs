@@ -6,7 +6,7 @@ public class BurningShopView : MonoBehaviour
 {
     private const string PointsKey = "BurningShop.Points";
 
-    [SerializeField] private Transform contentRoot;
+    public Transform contentRoot;
     [SerializeField] private BurningShopItemView itemViewPrefab;
     [SerializeField] private List<BurningData> burningItems = new List<BurningData>();
     [SerializeField] private TMP_Text pointsLabel;
@@ -15,6 +15,7 @@ public class BurningShopView : MonoBehaviour
     [SerializeField] private int defaultBurnReward = 1;
     [SerializeField] private ComboManager comboManager;
     [SerializeField] private BurningStashView stashView;
+    [SerializeField] private ProjectionUVUpdater burnManager;
 
     private readonly List<ItemBinding> itemBindings = new List<ItemBinding>();
     private int currentPoints;
@@ -130,6 +131,10 @@ public class BurningShopView : MonoBehaviour
         var parent = spawnParent != null ? spawnParent : null;
 
         var instance = Instantiate(data.Prefab, position, rotation, parent);
+        if (burnManager != null)
+        {
+            burnManager.Track(instance.GetComponent<BurningBehaviour>());
+        }
         instance.SetBurningData(data);
     }
 
@@ -147,7 +152,7 @@ public class BurningShopView : MonoBehaviour
         AddPoints(points);
     }
 
-    private void AddPoints(int amount)
+    public void AddPoints(int amount)
     {
         if (amount <= 0)
         {
@@ -160,7 +165,7 @@ public class BurningShopView : MonoBehaviour
         UpdateItemInteractivity();
     }
 
-    private void SpendPoints(int amount)
+    public void SpendPoints(int amount)
     {
         if (amount <= 0)
         {

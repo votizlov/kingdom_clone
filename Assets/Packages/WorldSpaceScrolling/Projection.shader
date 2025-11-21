@@ -6,6 +6,7 @@ Shader "Custom/Projection"
     {
         _MainTex ("Texture", 2D) = "white" {}
         _ProjectionTexture  ("Projection Texture", 2D) = "white" {}
+        _ProjCorrection ("ProjCorrection", Float) = 1 
         _SrcBlend ("SrcBlend", Float) = 1 // SrcAlpha
         _DstBlend ("DstBlend", Float) = 0 // OneMinusSrcAlpha
     }
@@ -42,6 +43,7 @@ Shader "Custom/Projection"
             sampler2D _ProjectionTexture;
             float4 _MainTex_ST;
             float4 _ProjectionTexture_ST;
+            float _ProjCorrection;
             uniform float4x4 _ProjectionMatrix;
             uniform float4x4 _ViewMatrix;
 
@@ -91,6 +93,10 @@ Shader "Custom/Projection"
                 projectTexCoord.y = -input.viewPosition.y / input.viewPosition.w * 0.5f + 0.5f;
 
                 projectTexCoord.y = 1- projectTexCoord.y;
+                float c = projectTexCoord.x - 0.5;          // center at 0
+float s = 1.0 - _ProjCorrection * abs(c);   // scale factor by distance
+s = max(s, 0.0);                             // avoid flipping
+projectTexCoord.x = 0.5 + c * s; 
                 projectionColor = tex2D(_ProjectionTexture, projectTexCoord);
                 color =  color * projectionColor;
                 return color;

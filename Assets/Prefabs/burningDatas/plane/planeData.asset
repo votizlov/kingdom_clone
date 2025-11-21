@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe2925076a924a019f71c4466626def6, type: 3}
+  m_Name: planeData
+  m_EditorClassIdentifier: 
+  prefab: {fileID: 3371234834144440218, guid: 8cbcac4cd7340384d9678f1a7dd1e8c5, type: 3}
+  icon: {fileID: 7307185696948522845, guid: d22b158f2656f504c870632a4667d11e, type: 3}
+  burnCost: 8
+  buyCost: 5

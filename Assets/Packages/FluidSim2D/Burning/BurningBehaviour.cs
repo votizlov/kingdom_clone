@@ -1,16 +1,17 @@
 using System;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Rendering.Universal;
 
 public class BurningBehaviour : MonoBehaviour
 {
     public RenderTexture renderTexture;
-    public MeshRenderer meshRenderer;
-    public MeshFilter meshFilter;
+    public SpriteRenderer meshRenderer;
     public Camera orthographicCamera;
     public bool isBurned = false;
     [SerializeField] private BurningData burningData;
     [SerializeField] private UnityEvent onBurned = new UnityEvent();
+    private int burnedPixelsToTrigger;
 
     private bool burnEventInvoked;
 
@@ -18,11 +19,12 @@ public class BurningBehaviour : MonoBehaviour
 
     public BurningData BurningData => burningData;
     public UnityEvent OnBurned => onBurned;
+    public int BurnedPixelsToTrigger => burnedPixelsToTrigger;
 
     private void OnValidate()
     {
-        meshRenderer = GetComponent<MeshRenderer>();
-        meshFilter = GetComponent<MeshFilter>();
+        //meshRenderer = GetComponent<MeshRenderer>();
+        //meshFilter = GetComponent<MeshFilter>();
     }
 
     public void SetBurningData(BurningData data)
@@ -43,11 +45,25 @@ public class BurningBehaviour : MonoBehaviour
         {
             return;
         }
-
+        orthographicCamera.enabled = false;
         burnEventInvoked = true;
         onBurned?.Invoke();
         Burned?.Invoke(this);
     }
+
+    public void RecalculateBurnRequirement(float burnedPercent)
+    {
+        if (renderTexture == null)
+        {
+            burnedPixelsToTrigger = 0;
+            return;
+        }
+
+        float clampedPercent = Mathf.Clamp01(burnedPercent);
+        int totalPixels = renderTexture.width * renderTexture.height;
+        burnedPixelsToTrigger = Mathf.CeilToInt(totalPixels * clampedPercent);
+    }
+
     public void DuplicateMeshToChild()
     {
         // Create new child object
@@ -59,7 +75,7 @@ public class BurningBehaviour : MonoBehaviour
 
         // Add and setup MeshFilter
         MeshFilter newMeshFilter = childObj.AddComponent<MeshFilter>();
-        newMeshFilter.sharedMesh = meshFilter.sharedMesh;
+        //newMeshFilter.sharedMesh = meshFilter.sharedMesh;
 
         // Add and setup MeshRenderer
         MeshRenderer newMeshRenderer = childObj.AddComponent<MeshRenderer>();
@@ -84,16 +100,17 @@ public class BurningBehaviour : MonoBehaviour
             // Set camera properties
             orthographicCamera.orthographic = true;
             orthographicCamera.clearFlags = CameraClearFlags.Nothing;
-            orthographicCamera.backgroundColor = Color.clear;
+            orthographicCamera.backgroundColor = Color.black;
             orthographicCamera.cullingMask = LayerMask.GetMask("BurningMask"); // Adjust the culling mask as needed
             orthographicCamera.targetTexture = renderTexture;
+            orthographicCamera.GetUniversalAdditionalCameraData().renderShadows = false;
             Debug.Log($"set tgt {renderTexture}");
             orthographicCamera.nearClipPlane = -10f;
             orthographicCamera.farClipPlane = 10f;
         }
 
         // Calculate the orthographic size and position based on the mesh's bounding box
-        Bounds bounds = meshFilter.sharedMesh.bounds;
+        Bounds bounds = meshRenderer.bounds;
 
         // Only consider the XY plane (side scroller)
         float sizeX = bounds.size.x * transform.localScale.x;

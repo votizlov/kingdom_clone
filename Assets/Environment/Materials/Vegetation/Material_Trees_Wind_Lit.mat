@@ -48,6 +48,7 @@ Material:
     - RimColor: {r: 0.682668, g: 0.6808473, b: 0.9433962, a: 1}
     - Vector2_AB971143: {r: 2, g: -0.2, b: 0, a: 0}
   m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!114 &7450263855452037230
 MonoBehaviour:
   m_ObjectHideFlags: 11
@@ -60,4 +61,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  version: 7
+  version: 10
